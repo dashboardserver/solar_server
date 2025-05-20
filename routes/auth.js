@@ -10,12 +10,8 @@ const JWT_SECRET = process.env.JWT_SECRET;
 router.post('/login', async (req, res) => {
   const { username, password, expectedDashboard } = req.body;
 
-  console.log('🧾 Login Request:', { username, password, expectedDashboard });
-
   try {
     const user = await User.findOne({ username });
-
-    console.log('📌 Found User:', user);
     
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
