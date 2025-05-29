@@ -47,13 +47,13 @@ async function fetchKPI(saveToDB = false) {
     if (!data) throw new Error('❌ ไม่พบข้อมูล KPI');
 
     const result = {
+      day_income: data.day_income ?? 0,
       total_income: data.total_income ?? 0,
-      total_power: data.total_power ?? 0,
       day_power: data.day_power ?? 0,
       month_power: data.month_power ?? 0,
-      day_income: data.day_income ?? 0,
-      day_use_energy: data.day_use_energy ?? 0,
-      day_on_grid_energy: data.day_on_grid_energy ?? 0,
+      total_power: data.total_power ?? 0,
+      co2_avoided: (data.total_power ?? 0) * 0.5,
+      equivalent_trees: (data.total_power ?? 0) * 0.0333,
       timestamp: new Date()
     };
 
@@ -76,6 +76,10 @@ async function fetchKPI(saveToDB = false) {
     console.error('❌ KPI Fetch Error:', err.message);
     return null;
   }
+}
+
+if (require.main === module) {
+  fetchKPI(true);
 }
 
 module.exports = fetchKPI;

@@ -36,7 +36,7 @@ mongoose.connect(process.env.MONGO_URI, {
 
 
       // ✅ บันทึกลง DB วันละ 1 ครั้ง (10:00 น.ไทย)
-      cron.schedule('0 3 * * *', async () => {
+      cron.schedule('0 14 * * *', async () => {
         await fetchKPI(true);
       });
 

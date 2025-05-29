@@ -8,8 +8,8 @@ const KPISchema = new mongoose.Schema({
   day_power: Number,
   month_power: Number,
   day_income: Number,
-  day_use_energy: Number,
-  day_on_grid_energy: Number
+  co2_avoided: Number,          
+  equivalent_trees: Number       
 });
 
 module.exports = mongoose.model('KPI', KPISchema);
