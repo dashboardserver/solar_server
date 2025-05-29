@@ -5,6 +5,7 @@ const cron = require('node-cron');
 const fetchKPI = require('./tasks/fetchKPI');
 const authRoutes = require('./routes/auth');
 const { router: seafdecRoutes, setKpiCache } = require('./routes/seafdec');
+const path = require('path');  // ✅ เพิ่มบรรทัดนี้
 require('dotenv').config();
 
 const app = express();
