@@ -28,11 +28,12 @@ mongoose.connect(process.env.MONGO_URI, {
     app.listen(5000, () => {
       console.log('🚀 Server running on port 5000');
 
-      // ✅ ดึงทุก 10 นาที (real-time cache)
-      cron.schedule('*/10 * * * *', async () => {
+      // ✅ ดึงทุก 1 ชั่วโมง (real-time cache)
+      cron.schedule('0 * * * *', async () => {
         const kpi = await fetchKPI(false);
         if (kpi) setKpiCache(kpi);
       });
+
 
       // ✅ บันทึกลง DB วันละ 1 ครั้ง (10:00 น.ไทย)
       cron.schedule('0 3 * * *', async () => {
