@@ -6,25 +6,17 @@ const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// POST /api/auth/login
+// ✅ POST /api/auth/login — ไม่ต้องใช้ expectedDashboard แล้ว
 router.post('/login', async (req, res) => {
-  const { username, password, expectedDashboard } = req.body;
+  const { username, password } = req.body;
 
   try {
     const user = await User.findOne({ username });
-    
+
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
-
-    // 🛡️ เพิ่มจุดนี้ — ถ้าเป็น user และ dashboard ไม่ตรง
-    if (
-      user.role === 'user' &&
-      user.assignedDashboard !== expectedDashboard
-    ) {
-      return res.status(403).json({ message: 'Permission denied: wrong dashboard' });
-    }
 
     const token = jwt.sign({
       id: user._id,
@@ -39,9 +31,8 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// POST /api/auth/create-user (admin only)
+// ✅ POST /api/auth/create-user
 router.post('/create-user', async (req, res) => {
-  console.log('📦 create-user request body:', req.body);
   const { username, password, assignedDashboard } = req.body;
 
   if (!username || !password || !assignedDashboard) {
@@ -68,7 +59,7 @@ router.post('/create-user', async (req, res) => {
   }
 });
 
-// DELETE /api/auth/delete-user
+// ✅ DELETE /api/auth/delete-user/:username
 router.delete('/delete-user/:username', async (req, res) => {
   const { username } = req.params;
 
@@ -85,7 +76,7 @@ router.delete('/delete-user/:username', async (req, res) => {
   }
 });
 
-// GET /api/auth/list-users
+// ✅ GET /api/auth/list-users
 router.get('/list-users', async (req, res) => {
   try {
     const users = await User.find({ role: 'user' }, 'username assignedDashboard');

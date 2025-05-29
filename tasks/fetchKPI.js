@@ -1,4 +1,4 @@
-// tasks/fetchKPI.js
+// Fetch KPI data from FusionSolar and save to MongoDB
 const axios = require('axios');
 const tough = require('tough-cookie');
 const { wrapper } = require('axios-cookiejar-support');
@@ -10,7 +10,7 @@ const USERNAME = 'yipintsoi';
 const PASSWORD = '0rpkx2stul6czxo13pq6ckho';
 const PLANT_NAME = 'STN-03423_ASL2411-00637_บริษัท ยิบอินซอย จำกัด';
 
-async function fetchKPI() {
+async function fetchKPI(saveToDB = false) {
   console.log('⏳ Fetching KPI from FusionSolar...');
 
   try {
@@ -46,25 +46,7 @@ async function fetchKPI() {
     const data = kpiRes.data?.data?.[0]?.dataItemMap;
     if (!data) throw new Error('❌ ไม่พบข้อมูล KPI');
 
-    console.log('🔍 Raw KPI Data:', {
-      total_income: data.total_income,
-      total_power: data.total_power,
-      day_power: data.day_power,
-      month_power: data.month_power,
-      day_income: data.day_income,
-      day_use_energy: data.day_use_energy,
-      day_on_grid_energy: data.day_on_grid_energy
-    });
-
-    const today = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const existing = await KPI.findOne({ date: today });
-    if (existing) {
-      console.log('✅ Already saved for today, skip saving.');
-      return;
-    }
-    
-    const newKPI = new KPI({
-      date: today,
+    const result = {
       total_income: data.total_income ?? 0,
       total_power: data.total_power ?? 0,
       day_power: data.day_power ?? 0,
@@ -72,12 +54,27 @@ async function fetchKPI() {
       day_income: data.day_income ?? 0,
       day_use_energy: data.day_use_energy ?? 0,
       day_on_grid_energy: data.day_on_grid_energy ?? 0,
-    });
+      timestamp: new Date()
+    };
 
-    await newKPI.save();
-    console.log(`✅ KPI saved for today: ${today}`);
+    console.log('✅ KPI Data:', result);
+
+    if (saveToDB) {
+      const today = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const existing = await KPI.findOne({ date: today });
+      if (existing) {
+        console.log('✅ Already saved for today, skip saving.');
+        return result;
+      }
+
+      await KPI.create({ date: today, ...result });
+      console.log(`✅ KPI saved to MongoDB for ${today}`);
+    }
+
+    return result;
   } catch (err) {
-    console.error('❌ KPI Fetch Error:', err);
+    console.error('❌ KPI Fetch Error:', err.message);
+    return null;
   }
 }
 
