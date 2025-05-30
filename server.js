@@ -18,33 +18,40 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/seafdec', seafdecRoutes);
 
-// เชื่อมต่อ MongoDB
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
+// ✅ เชื่อมต่อ MongoDB
+mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected');
+
+    // ✅ Start Express Server
     app.listen(5000, () => {
       console.log('🚀 Server running on port 5000');
-
-      // ✅ ดึงทุก 1 ชั่วโมง (real-time cache)
-      cron.schedule('0 * * * *', async () => {
-        const kpi = await fetchKPI(false);
-        if (kpi) setKpiCache(kpi);
-      });
-
-
-      // ✅ บันทึกลง DB วันละ 1 ครั้ง (10:00 น.ไทย)
+      
+      // ✅ ดึงและบันทึกลง DB วันละครั้ง (เวลา 21:00 น.ไทย)
       cron.schedule('0 14 * * *', async () => {
+        console.log('📥 Daily scheduled KPI fetch at 21:00 (TH time)');
         await fetchKPI(true);
       });
 
-      // ✅ ดึงครั้งแรกทันที
+      // ✅ ดึงครั้งแรกทันที ถ้ายังไม่มีใน DB
       (async () => {
-        const kpi = await fetchKPI(false);
-        if (kpi) setKpiCache(kpi);
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          const KPI = require('./models/KPI');
+          const existing = await KPI.findOne({ date: today });
+          if (!existing) {
+            console.log('📥 Initial fetch KPI...');
+            const kpi = await fetchKPI(true);
+            if (kpi) setKpiCache(kpi);
+          } else {
+            console.log('✅ KPI already exists in DB');
+            setKpiCache(existing);
+          }
+        } catch (err) {
+          console.error('❌ Error during initial KPI fetch:', err.message);
+        }
       })();
+
     });
   })
   .catch((err) => console.error('❌ MongoDB connection error:', err.message));

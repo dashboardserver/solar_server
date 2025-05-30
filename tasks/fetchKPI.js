@@ -5,10 +5,10 @@ const { wrapper } = require('axios-cookiejar-support');
 const KPI = require('../models/KPI');
 require('dotenv').config();
 
-const BASE_URL = 'https://sg5.fusionsolar.huawei.com';
-const USERNAME = 'yipintsoi';
-const PASSWORD = '0rpkx2stul6czxo13pq6ckho';
-const PLANT_NAME = 'STN-03423_ASL2411-00637_บริษัท ยิบอินซอย จำกัด';
+const BASE_URL = process.env.FUSION_BASE_URL;
+const USERNAME = process.env.FUSION_USERNAME;
+const PASSWORD = process.env.FUSION_PASSWORD;
+const PLANT_NAME = process.env.FUSION_PLANT_NAME;
 
 async function fetchKPI(saveToDB = false) {
   console.log('⏳ Fetching KPI from FusionSolar...');
