@@ -6,7 +6,7 @@ const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// ✅ POST /api/auth/login — ไม่ต้องใช้ expectedDashboard แล้ว
+// POST /api/auth/login
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
@@ -31,7 +31,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// ✅ POST /api/auth/create-user
+// POST /api/auth/create-user
 router.post('/create-user', async (req, res) => {
   const { username, password, assignedDashboard } = req.body;
 
@@ -59,7 +59,7 @@ router.post('/create-user', async (req, res) => {
   }
 });
 
-// ✅ DELETE /api/auth/delete-user/:username
+// DELETE /api/auth/delete-user/:username
 router.delete('/delete-user/:username', async (req, res) => {
   const { username } = req.params;
 
@@ -76,7 +76,7 @@ router.delete('/delete-user/:username', async (req, res) => {
   }
 });
 
-// ✅ GET /api/auth/list-users
+// GET /api/auth/list-users
 router.get('/list-users', async (req, res) => {
   try {
     const users = await User.find({ role: 'user' }, 'username assignedDashboard');

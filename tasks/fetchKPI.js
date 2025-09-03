@@ -5,19 +5,19 @@ const { wrapper } = require('axios-cookiejar-support');
 const KPI = require('../models/KPI');
 require('dotenv').config();
 
-// ======= ENV เดิม (คงไว้) =======
+// ENV
 const BASE_URL   = process.env.FUSION_BASE_URL;
 const USERNAME   = process.env.FUSION_USERNAME;
 const PASSWORD   = process.env.FUSION_PASSWORD;
 const PLANT_NAME = process.env.FUSION_PLANT_NAME;
 
-// ======= Helpers เวลาแบบไม่พึ่ง lib (โซน Asia/Bangkok) =======
-const BKK_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7
+//  Helpers (โซน Asia/Bangkok) 
+const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
 function bkkYYYYMMDD(d) {
-  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }); // 'YYYY-MM-DD'
+  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
 }
 function startOfBkkDayUTC(dateUtc = new Date()) {
-  const ymd = bkkYYYYMMDD(dateUtc).split('-').map(Number); // [Y,M,D] ของ "วันนี้(ไทย)"
+  const ymd = bkkYYYYMMDD(dateUtc).split('-').map(Number); 
   const utcMidnightOfBkkDay = Date.UTC(ymd[0], ymd[1]-1, ymd[2]) - BKK_OFFSET_MS;
   return new Date(utcMidnightOfBkkDay);
 }
@@ -26,7 +26,7 @@ function startOfBkkTomorrowUTC() {
   return new Date(todayStartUTC.getTime() + 24*60*60*1000);
 }
 
-// ======= ดึง KPI จาก FusionSolar (คงลอจิกเดิม) =======
+// ดึง KPI จาก FusionSolar
 async function fetchKPI(saveToDB = true) {
   console.log('⏳ Fetching KPI from FusionSolar...');
 
@@ -39,15 +39,15 @@ async function fetchKPI(saveToDB = true) {
   const client = wrapper(axios.create({ baseURL: BASE_URL, jar, withCredentials: true }));
 
   try {
-    // 1) Login
+    // Login
     await client.post(`/thirdData/login`, { userName: USERNAME, systemCode: PASSWORD });
 
-    // 2) XSRF
+    // XSRF
     const token = jar.getCookiesSync(BASE_URL).find(c => c.key === 'XSRF-TOKEN')?.value;
     if (!token) throw new Error('XSRF-TOKEN not found after login');
     const headers = { 'XSRF-TOKEN': token, 'Content-Type': 'application/json' };
 
-    // 3) หา station
+    // หา station
     const stationRes = await client.post(`/thirdData/getStationList`, {}, { headers });
     if (!stationRes.data?.success) throw new Error('getStationList failed');
 
@@ -61,12 +61,12 @@ async function fetchKPI(saveToDB = true) {
     const stationCode = plant.stationCode || plant.id || plant.stationId;
     if (!stationCode) throw new Error('Station code missing');
 
-    // 4) KPI จริง
+    // KPI จริง
     const kpiRes = await client.post(`/thirdData/getStationRealKpi`, { stationCodes: stationCode }, { headers });
     const dataItemMap = kpiRes.data?.data?.[0]?.dataItemMap;
     if (!dataItemMap) throw new Error('KPI dataItemMap not found');
 
-    // 5) รูปแบบผลลัพธ์ "เหมือนเดิม"
+    // รูปแบบผลลัพธ์ "เหมือนเดิม"
     const result = {
       day_income: dataItemMap.day_income ?? 0,
       total_income: dataItemMap.total_income ?? 0,
@@ -81,7 +81,7 @@ async function fetchKPI(saveToDB = true) {
     console.log('✅ KPI result (original shape):', result);
 
     if (saveToDB) {
-      // ===== จุดสำคัญ: เซฟเป็น "วันพรุ่งนี้" =====
+      //  จุดสำคัญ: เซฟเป็น "วันพรุ่งนี้" 
       const appliesToDate = startOfBkkTomorrowUTC();     // Date (UTC) ที่แทน "พรุ่งนี้ 00:00 (ไทย)"
       const dateStr       = bkkYYYYMMDD(appliesToDate);  // เก็บ 'date' (string) = YYYY-MM-DD ของพรุ่งนี้
       const fetchedAt     = new Date();                  // เวลาดึงจริง (วันนี้)
@@ -103,5 +103,4 @@ async function fetchKPI(saveToDB = true) {
   }
 }
 
-// ให้ server เรียกใช้ได้
 module.exports = fetchKPI;

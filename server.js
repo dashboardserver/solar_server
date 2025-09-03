@@ -19,7 +19,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/seafdec', seafdecRoutes);
 
-// ===== Helpers เวลา Asia/Bangkok เพื่อ initial cache =====
+// Helpers เวลา Asia/Bangkok
 const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
 function bkkYYYYMMDD(d) {
   return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
@@ -29,22 +29,26 @@ function startOfBkkDayUTC(dateUtc = new Date()) {
   return new Date(Date.UTC(y, m-1, day) - BKK_OFFSET_MS);
 }
 
-// ✅ เชื่อมต่อ MongoDB
+// เชื่อมต่อ MongoDB
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected');
 
-    // ✅ Start Express Server
+    // Start Express Server
     app.listen(5000, () => {
       console.log('🚀 Server running on port 5000');
+      const PORT = process.env.PORT || 5000;
+      app.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+      })
 
-      // ✅ ตั้งดึงทุกวันเวลา 21:00 น. (ไทย) → บันทึกเป็น "วันพรุ่งนี้"
+      // ตั้งดึงทุกวันเวลา 21:00 น. (ไทย) → บันทึกเป็น "วันพรุ่งนี้"
       cron.schedule('0 21 * * *', async () => {
-        console.log('📥 Daily scheduled KPI fetch at 00:05 (TH time)');
+        console.log('📥 Daily scheduled KPI fetch at 21:00 (TH time)');
         await fetchKPI(true);
       }, { timezone: 'Asia/Bangkok' });
 
-      // ✅ Initial cache: พยายามโหลด "ของวันนี้" (appliesToDate = วันนี้ 00:00 ไทย)
+      // Initial cache: พยายามโหลด "ของวันนี้" (appliesToDate = วันนี้ 00:00 ไทย)
       (async () => {
         try {
           const KPI = require('./models/KPI');

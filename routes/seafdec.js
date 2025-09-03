@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const KPI = require('../models/KPI');
 
-// ===== Helpers เวลา Asia/Bangkok =====
+// Helpers เวลา Asia/Bangkok 
 const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
 function bkkYYYYMMDD(d) {
   return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
@@ -13,10 +13,9 @@ function startOfBkkDayUTC(dateUtc = new Date()) {
   return new Date(Date.UTC(y, m-1, day) - BKK_OFFSET_MS);
 }
 
-// ✅ cache ของเดิม (เผื่อ FE เดิมเรียกใช้อยู่)
+// date เก่า
 let cachedKPI = null;
 
-// ---------- ของเดิม ----------
 router.get('/kpi/latest', (req, res) => {
   if (cachedKPI) return res.json(cachedKPI);
   res.status(404).json({ message: 'No KPI available' });
@@ -33,15 +32,23 @@ router.get('/kpi/:date', async (req, res) => {
   }
 });
 
-// ---------- ใหม่: ให้ Dashboard เรียก “ของวันนี้” ----------
+//  แสดง “ของวันนี้”
 router.get('/today', async (_req, res) => {
-  const todayApplies = startOfBkkDayUTC(new Date()); // 00:00 วันนี้(ไทย) ในรูป Date(UTC)
+  const todayApplies = startOfBkkDayUTC(new Date()); // 00:00 วันนี้(ไทย) → Date(UTC)
   try {
     let doc = await KPI.findOne({ appliesToDate: todayApplies });
     if (!doc) {
-      // fallback: เอาวันล่าสุดที่ <= วันนี้
-      doc = await KPI.findOne({ appliesToDate: { $lte: todayApplies } }).sort({ appliesToDate: -1 });
+      doc = await KPI
+        .findOne({ appliesToDate: { $lte: todayApplies } })
+        .sort({ appliesToDate: -1 });
     }
+    if (!doc) {
+      const ymdToday = bkkYYYYMMDD(new Date());
+      doc = await KPI
+        .findOne({ date: { $lte: ymdToday } })
+        .sort({ date: -1 });
+    }
+
     if (!doc) return res.status(404).json({ message: 'No data yet' });
 
     return res.json({
@@ -61,7 +68,7 @@ router.get('/today', async (_req, res) => {
   }
 });
 
-// ---------- ใหม่: ระบุวันเอง ?date=YYYY-MM-DD ----------
+//  ระบุวันเอง 
 router.get('/by-date', async (req, res) => {
   const { date } = req.query;
   if (!date) return res.status(400).json({ message: 'query param "date" is required (YYYY-MM-DD)' });
@@ -71,7 +78,12 @@ router.get('/by-date', async (req, res) => {
     const [y,m,day] = date.split('-').map(Number);
     const appliesTo = new Date(Date.UTC(y, m-1, day) - BKK_OFFSET_MS);
 
-    const doc = await KPI.findOne({ appliesToDate: appliesTo });
+    let doc = await KPI.findOne({ appliesToDate: appliesTo });
+
+    if (!doc) {
+      doc = await KPI.findOne({ date });
+    }
+
     if (!doc) return res.status(404).json({ message: 'No data for that date' });
 
     return res.json({
