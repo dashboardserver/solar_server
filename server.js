@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -18,6 +19,16 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/seafdec', seafdecRoutes);
 
+// ===== Helpers เวลา Asia/Bangkok เพื่อ initial cache =====
+const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
+function bkkYYYYMMDD(d) {
+  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+}
+function startOfBkkDayUTC(dateUtc = new Date()) {
+  const [y,m,day] = bkkYYYYMMDD(dateUtc).split('-').map(Number);
+  return new Date(Date.UTC(y, m-1, day) - BKK_OFFSET_MS);
+}
+
 // ✅ เชื่อมต่อ MongoDB
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
@@ -26,32 +37,35 @@ mongoose.connect(process.env.MONGO_URI)
     // ✅ Start Express Server
     app.listen(5000, () => {
       console.log('🚀 Server running on port 5000');
-      
-      // ✅ ดึงและบันทึกลง DB วันละครั้ง (เวลา 21:00 น.ไทย)
-      cron.schedule('0 14 * * *', async () => {
-        console.log('📥 Daily scheduled KPI fetch at 21:00 (TH time)');
-        await fetchKPI(true);
-      });
 
-      // ✅ ดึงครั้งแรกทันที ถ้ายังไม่มีใน DB
+      // ✅ ตั้งดึงทุกวันเวลา 21:00 น. (ไทย) → บันทึกเป็น "วันพรุ่งนี้"
+      cron.schedule('0 21 * * *', async () => {
+        console.log('📥 Daily scheduled KPI fetch at 00:05 (TH time)');
+        await fetchKPI(true);
+      }, { timezone: 'Asia/Bangkok' });
+
+      // ✅ Initial cache: พยายามโหลด "ของวันนี้" (appliesToDate = วันนี้ 00:00 ไทย)
       (async () => {
         try {
-          const today = new Date().toISOString().split('T')[0];
           const KPI = require('./models/KPI');
-          const existing = await KPI.findOne({ date: today });
-          if (!existing) {
-            console.log('📥 Initial fetch KPI...');
-            const kpi = await fetchKPI(true);
-            if (kpi) setKpiCache(kpi);
+          const todayApplies = startOfBkkDayUTC(new Date());
+
+          let doc = await KPI.findOne({ appliesToDate: todayApplies });
+          if (!doc) {
+            doc = await KPI.findOne({ appliesToDate: { $lte: todayApplies } }).sort({ appliesToDate: -1 });
+          }
+
+          if (doc) {
+            console.log('✅ Loaded KPI for today into cache');
+            setKpiCache(doc);
           } else {
-            console.log('✅ KPI already exists in DB');
-            setKpiCache(existing);
+            console.log('ℹ️ No KPI for today yet, triggering one fetch for tomorrow snapshot...');
+            await fetchKPI(true); // เตรียมของ "พรุ่งนี้" ไว้เลย
           }
         } catch (err) {
-          console.error('❌ Error during initial KPI fetch:', err.message);
+          console.error('❌ Error during initial KPI load:', err.message);
         }
       })();
-
     });
   })
   .catch((err) => console.error('❌ MongoDB connection error:', err.message));
