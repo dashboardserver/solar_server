@@ -1,4 +1,4 @@
-// server.js
+// server.js (ฉบับแก้)
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -29,47 +29,44 @@ function startOfBkkDayUTC(dateUtc = new Date()) {
   return new Date(Date.UTC(y, m-1, day) - BKK_OFFSET_MS);
 }
 
-// เชื่อมต่อ MongoDB
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log('✅ MongoDB connected');
+// เชื่อมต่อ MongoDB แล้วค่อยเริ่ม server
+mongoose.connect(process.env.MONGO_URI).then(() => {
+  console.log('✅ MongoDB connected');
 
-    // Start Express Server
-    app.listen(5000, () => {
-      console.log('🚀 Server running on port 5000');
-      const PORT = process.env.PORT || 5000;
-      app.listen(PORT, () => {
-        console.log(`🚀 Server running on port ${PORT}`);
-      })
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
 
-      // ตั้งดึงทุกวันเวลา 21:00 น. (ไทย) → บันทึกเป็น "วันพรุ่งนี้"
-      cron.schedule('0 21 * * *', async () => {
-        console.log('📥 Daily scheduled KPI fetch at 21:00 (TH time)');
-        await fetchKPI(true);
-      }, { timezone: 'Asia/Bangkok' });
+    // ดึงทุกวัน 21:00 (เวลาไทย) → บันทึกเป็น "วันพรุ่งนี้"
+    cron.schedule('0 21 * * *', async () => {
+      console.log('📥 Daily scheduled KPI fetch at 21:00 (TH time)');
+      await fetchKPI(true);
+    }, { timezone: 'Asia/Bangkok' });
 
-      // Initial cache: พยายามโหลด "ของวันนี้" (appliesToDate = วันนี้ 00:00 ไทย)
-      (async () => {
-        try {
-          const KPI = require('./models/KPI');
-          const todayApplies = startOfBkkDayUTC(new Date());
+    // Initial cache: พยายามโหลด "ของวันนี้" (ไม่โชว์อนาคต)
+    (async () => {
+      try {
+        const KPI = require('./models/KPI');
+        const todayApplies = startOfBkkDayUTC(new Date());
 
-          let doc = await KPI.findOne({ appliesToDate: todayApplies });
-          if (!doc) {
-            doc = await KPI.findOne({ appliesToDate: { $lte: todayApplies } }).sort({ appliesToDate: -1 });
-          }
-
-          if (doc) {
-            console.log('✅ Loaded KPI for today into cache');
-            setKpiCache(doc);
-          } else {
-            console.log('ℹ️ No KPI for today yet, triggering one fetch for tomorrow snapshot...');
-            await fetchKPI(true); // เตรียมของ "พรุ่งนี้" ไว้เลย
-          }
-        } catch (err) {
-          console.error('❌ Error during initial KPI load:', err.message);
+        let doc = await KPI.findOne({ appliesToDate: todayApplies });
+        if (!doc) {
+          doc = await KPI.findOne({ appliesToDate: { $lte: todayApplies } }).sort({ appliesToDate: -1 });
         }
-      })();
-    });
-  })
-  .catch((err) => console.error('❌ MongoDB connection error:', err.message));
+
+        if (doc) {
+          console.log('✅ Loaded KPI for today into cache');
+          setKpiCache(doc);
+        } else {
+          // ถ้าไม่อยากให้ดึงพรุ่งนี้อัตโนมัติ ให้คอมเมนต์ 3 บรรทัดนี้ทิ้งได้
+          console.log('ℹ️ No KPI for today yet, triggering one fetch for tomorrow snapshot...');
+          await fetchKPI(true); // เตรียมของ "พรุ่งนี้" ไว้ล่วงหน้า
+        }
+      } catch (err) {
+        console.error('❌ Error during initial KPI load:', err.message);
+      }
+    })();
+  });
+}).catch(err => {
+  console.error('❌ MongoDB connection error:', err.message);
+});
