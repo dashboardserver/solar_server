@@ -31,6 +31,9 @@ mongoose.connect(process.env.MONGO_URI, {
     process.exit(1);
   });
 
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
+
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, async () => {
