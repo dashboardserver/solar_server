@@ -1,4 +1,3 @@
-// routes/seafdec.js
 const express = require('express');
 const router = express.Router();
 const KPI = require('../models/KPI');
@@ -9,8 +8,8 @@ function bkkYYYYMMDD(d) {
   return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
 }
 function startOfBkkDayUTC(dateUtc = new Date()) {
-  const [y,m,day] = bkkYYYYMMDD(dateUtc).split('-').map(Number);
-  return new Date(Date.UTC(y, m-1, day) - BKK_OFFSET_MS);
+  const [y, m, day] = bkkYYYYMMDD(dateUtc).split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, day) - BKK_OFFSET_MS);
 }
 
 // date เก่า
@@ -34,7 +33,7 @@ router.get('/kpi/:date', async (req, res) => {
 
 //  แสดง “ของวันนี้”
 router.get('/today', async (_req, res) => {
-  const todayApplies = startOfBkkDayUTC(new Date()); // 00:00 วันนี้(ไทย) → Date(UTC)
+  const todayApplies = startOfBkkDayUTC(new Date());
   try {
     let doc = await KPI.findOne({ appliesToDate: todayApplies });
     if (!doc) {
@@ -75,8 +74,8 @@ router.get('/by-date', async (req, res) => {
 
   try {
     // สร้าง appliesToDate ของวันนั้น (00:00 ไทย)
-    const [y,m,day] = date.split('-').map(Number);
-    const appliesTo = new Date(Date.UTC(y, m-1, day) - BKK_OFFSET_MS);
+    const [y, m, day] = date.split('-').map(Number);
+    const appliesTo = new Date(Date.UTC(y, m - 1, day) - BKK_OFFSET_MS);
 
     let doc = await KPI.findOne({ appliesToDate: appliesTo });
 

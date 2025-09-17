@@ -16,7 +16,6 @@ function startOfBkkTomorrowUTC(d = new Date()) {
   return new Date(startOfBkkDayUTC(d).getTime() + 24 * 60 * 60 * 1000);
 }
 
-// ส่งออกเฉพาะฟิลด์ที่หน้า UI ใช้
 const PROJECTION = {
   _id: 0,
   date: 1,
@@ -33,16 +32,15 @@ const PROJECTION = {
 };
 
 // GET /api/kpi/:sourceKey/today
-// ดีไซน์ของเรา “เซฟเป็นของพรุ่งนี้ (เวลาไทย)” -> วันนี้ให้ดึง appliesToDate=พรุ่งนี้ 00:00(ไทย)
+// เซฟเป็นของพรุ่งนี้ (เวลาไทย) -> วันนี้ให้ดึง appliesToDate=พรุ่งนี้ 00:00(ไทย)
+
 router.get('/:sourceKey/today', async (req, res) => {
   try {
     const { sourceKey } = req.params;
     const appliesTo = startOfBkkTomorrowUTC(new Date());
 
-    // หาเรคอร์ดของวันเป้าหมาย
     let doc = await KPI.findOne({ sourceKey, appliesToDate: appliesTo }, PROJECTION).lean();
 
-    // เผื่อยังไม่มี (เช่นเพิ่งเริ่มระบบ) → fallback เป็นเรคอร์ดล่าสุดของ sourceKey
     if (!doc) {
       doc = await KPI.findOne({ sourceKey }, PROJECTION).sort({ appliesToDate: -1 }).lean();
     }
@@ -55,20 +53,17 @@ router.get('/:sourceKey/today', async (req, res) => {
   }
 });
 
-// GET /api/kpi/:sourceKey/by-date?date=YYYY-MM-DD (ตีความตามฟิลด์ date ที่เราเซฟไว้)
+// GET /api/kpi/:sourceKey/by-date?date=YYYY-MM-DD
 router.get('/:sourceKey/by-date', async (req, res) => {
   try {
     const { sourceKey } = req.params;
-    const { date } = req.query; // รูปแบบ YYYY-MM-DD
+    const { date } = req.query;
 
     if (!date) return res.status(400).send('Missing date (YYYY-MM-DD)');
 
-    // เราเซฟ field `date` เป็นสตริง YYYY-MM-DD แล้วอยู่แล้ว
-    // หาแบบตรง ๆ ก่อน ถ้าไม่เจอค่อย fallback หา appliesToDate เที่ยงคืนไทยของวันนั้น
     let doc = await KPI.findOne({ sourceKey, date }, PROJECTION).lean();
 
     if (!doc) {
-      // เผื่อเอกสารเก่าๆ ไม่มีฟิลด์ date -> ใช้ appliesToDate แทน
       const target = startOfBkkDayUTC(new Date(date + 'T00:00:00'));
       doc = await KPI.findOne({ sourceKey, appliesToDate: target }, PROJECTION).lean();
     }

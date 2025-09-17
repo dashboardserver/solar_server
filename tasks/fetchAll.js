@@ -1,4 +1,3 @@
-// tasks/fetchAll.js
 require('dotenv').config();
 const fetchKPI = require('./fetchKPI');
 const KPI = require('../models/KPI');
@@ -37,7 +36,7 @@ function startOfBkkTomorrowUTC() {
 }
 
 // กันตั้ง retry ซ้ำในวันเดียวกันต่อสถานี
-const retryFlags = new Map(); // key: sourceKey + YYYY-MM-DD
+const retryFlags = new Map(); 
 function dayKey(date = new Date()) { return bkkYYYYMMDD(date); }
 
 async function scheduleRetry(cfg, saveToDB, delayMs = 30 * 60 * 1000) {
@@ -52,7 +51,7 @@ async function scheduleRetry(cfg, saveToDB, delayMs = 30 * 60 * 1000) {
   setTimeout(async () => {
     try {
       console.log(`🔁 [${cfg.sourceKey}] Retry fetch now (after 30 min)`);
-      // ก่อนดึงอีกรอบ เช็คอีกครั้ง—ถ้ามีแล้วก็ไม่ดึง
+      //  เช็คถ้ามีแล้วก็ไม่ดึง
       const tomorrow = startOfBkkTomorrowUTC();
       const exists = await KPI.exists({ sourceKey: cfg.sourceKey, appliesToDate: tomorrow });
       if (exists) {
@@ -76,17 +75,17 @@ async function fetchAll(saveToDB = true) {
   const tomorrow = startOfBkkTomorrowUTC();
 
   for (const cfg of jobs) {
-    // ⛔ เช็คก่อน: ถ้ามีของพรุ่งนี้แล้ว → ไม่ต้องยิง API
+    // เช็คก่อนถ้ามีของพรุ่งนี้แล้ว ไม่ต้องยิง API
     const exists = await KPI.exists({ sourceKey: cfg.sourceKey, appliesToDate: tomorrow });
     if (exists) {
       console.log(`🟡 [${cfg.sourceKey}] KPI for tomorrow already exists — skip fetch`);
     } else {
       const res = await fetchKPI(cfg, saveToDB);
       if (!res) {
-        // ดึงพลาด → ตั้ง retry 30 นาที
+        // ดึงพลาด ตั้ง retry 30 นาที
         await scheduleRetry(cfg, saveToDB);
       }
-      // กัน rate-limit: หน่วงระหว่างสถานี
+      // กัน rate-limit หน่วงระหว่างสถานี
       await sleep(15000);
     }
   }

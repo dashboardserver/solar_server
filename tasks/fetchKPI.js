@@ -1,4 +1,3 @@
-// tasks/fetchKPI.js
 const axios = require('axios');
 const tough = require('tough-cookie');
 const { wrapper } = require('axios-cookiejar-support');
@@ -14,7 +13,6 @@ function startOfBkkDayUTC(dateUtc = new Date()) {
 }
 function startOfBkkTomorrowUTC() { return new Date(startOfBkkDayUTC().getTime() + 24*60*60*1000); }
 
-// ลองดึง KPI: ทดลองทั้ง plantCodes และ stationCodes (บาง tenant ใช้อย่างใดอย่างหนึ่ง)
 async function fetchKpiFlexible(client, headers, code, sourceKey='default') {
   let res = await client.post('/thirdData/getStationRealKpi', { plantCodes: code }, { headers });
   let dataItemMap = res.data?.data?.[0]?.dataItemMap;
@@ -28,13 +26,6 @@ async function fetchKpiFlexible(client, headers, code, sourceKey='default') {
   return { res, dataItemMap };
 }
 
-/**
- * cfg = {
- *   baseUrl, userName, systemCode,
- *   plantName,   // ใช้ค้นสถานี (จำเป็น)
- *   sourceKey    // label เอกสารใน DB เช่น "yipintsoi" หรือ "SEAFDEC"
- * }
- */
 async function fetchKPI(cfg, saveToDB = true) {
   const BASE_URL   = cfg?.baseUrl   || process.env.FUSION_BASE_URL;
   const USERNAME   = cfg?.userName  || process.env.FUSION_USERNAME;
@@ -56,16 +47,16 @@ async function fetchKPI(cfg, saveToDB = true) {
   const client = wrapper(axios.create({ baseURL: BASE_URL, jar, withCredentials: true, timeout: 20000 }));
 
   try {
-    // 1) login
+    // login
     await client.post('/thirdData/login', { userName: USERNAME, systemCode: PASSWORD });
 
-    // 2) xsrf
+    // xsrf
     const token = jar.getCookiesSync(BASE_URL).find(c => c.key === 'XSRF-TOKEN')?.value;
     if (!token) throw new Error('XSRF-TOKEN not found after login');
     const headers = { 'XSRF-TOKEN': token, 'Content-Type': 'application/json' };
 
-    // 3) หา station จากชื่อ (บังคับใช้ชื่อเท่านั้น)
-    const stationRes = await client.post('/thirdData/getStationList', {}, { headers }); // body ว่าง เหมือนที่คุณเคยใช้ได้
+    // หา station จากชื่อ
+    const stationRes = await client.post('/thirdData/getStationList', {}, { headers });
     const ok = (typeof stationRes.data?.success === 'boolean') ? stationRes.data.success : true;
     if (!ok) throw new Error('getStationList failed');
 
@@ -75,7 +66,6 @@ async function fetchKPI(cfg, saveToDB = true) {
 
     if (!stations.length) throw new Error('No station visible for this API account');
 
-    // ตรงเป๊ะก่อน ไม่เจอค่อย fuzzy (กันเคสสะกด/ช่องว่างเล็กน้อย)
     let plant = stations.find(st => (st.stationName || st.name) === PLANT_NAME);
     if (!plant) {
       const target = PLANT_NAME.toLowerCase();
@@ -92,7 +82,7 @@ async function fetchKPI(cfg, saveToDB = true) {
     const stationName = plant.stationName || plant.name || '';
     if (!stationCode) throw new Error('Station code missing');
 
-    // 4) KPI (flexible)
+    // KPI (flexible)
     const { dataItemMap } = await fetchKpiFlexible(client, headers, stationCode, SOURCE_KEY);
     if (!dataItemMap) throw new Error('KPI dataItemMap not found');
 
@@ -114,7 +104,7 @@ async function fetchKPI(cfg, saveToDB = true) {
       const fetchedAt = new Date();
 
       await KPI.updateOne(
-        { appliesToDate, sourceKey: SOURCE_KEY },  // 1 เอกสาร/วัน/สถานี (แยกด้วย sourceKey)
+        { appliesToDate, sourceKey: SOURCE_KEY },
         {
           $set: {
             sourceKey: SOURCE_KEY,
