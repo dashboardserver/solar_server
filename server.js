@@ -10,6 +10,13 @@ const { router: kpiRoutes } = require('./routes/kpi');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.get('/', (_req, res) => {
+  res.send('✅ Solar backend is running');
+});
+
+app.get('/healthz', (_req, res) => {
+  res.status(200).json({ ok: true, uptime: process.uptime() });
+});
 
 // API routes
 app.use('/api/kpi', kpiRoutes);
