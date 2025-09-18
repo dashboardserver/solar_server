@@ -1,19 +1,21 @@
-// routes/kpi.js
 const express = require('express');
 const KPI = require('../models/KPI');
 
 const router = express.Router();
 
-// helper: เวลาไทย
+// Helpers: เวลาไทย
 const BKK = 'Asia/Bangkok';
 const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+// คืน Date (UTC) ของ เที่ยงคืนเวลาไทย ของวันที่ที่ระบุ
 function startOfBkkDayUTC(d = new Date()) {
-  const ymd = d.toLocaleDateString('en-CA', { timeZone: BKK }).split('-').map(Number);
-  // เที่ยงคืนเวลาไทย ในรูป UTC
-  return new Date(Date.UTC(ymd[0], ymd[1] - 1, ymd[2]) - BKK_OFFSET_MS);
+  const [y, m, day] = d.toLocaleDateString('en-CA', { timeZone: BKK }).split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, day) - BKK_OFFSET_MS);
 }
-function startOfBkkTomorrowUTC(d = new Date()) {
-  return new Date(startOfBkkDayUTC(d).getTime() + 24 * 60 * 60 * 1000);
+
+// คืนสตริง YYYY-MM-DD (เวลาไทย)
+function bkkTodayStr(d = new Date()) {
+  return d.toLocaleDateString('en-CA', { timeZone: BKK });
 }
 
 const PROJECTION = {
@@ -32,17 +34,21 @@ const PROJECTION = {
 };
 
 // GET /api/kpi/:sourceKey/today
-// เซฟเป็นของพรุ่งนี้ (เวลาไทย) -> วันนี้ให้ดึง appliesToDate=พรุ่งนี้ 00:00(ไทย)
-
+// แสดงrecord ล่าสุดที่ไม่เกินวันนี้ (เวลาไทย)
 router.get('/:sourceKey/today', async (req, res) => {
   try {
     const { sourceKey } = req.params;
-    const appliesTo = startOfBkkTomorrowUTC(new Date());
+    const todayStr = bkkTodayStr(new Date());
 
-    let doc = await KPI.findOne({ sourceKey, appliesToDate: appliesTo }, PROJECTION).lean();
+    // หาrecordของ "วันนี้" ตาม field `date` ก่อน
+    let doc = await KPI.findOne({ sourceKey, date: todayStr }, PROJECTION).lean();
 
+    // ถ้ายังไม่มี ให้หาrecordล่าสุดที่ `date <= วันนี้`
     if (!doc) {
-      doc = await KPI.findOne({ sourceKey }, PROJECTION).sort({ appliesToDate: -1 }).lean();
+      doc = await KPI.findOne(
+        { sourceKey, date: { $lte: todayStr } },
+        PROJECTION
+      ).sort({ date: -1 }).lean();
     }
 
     if (!doc) return res.status(404).send('Not found');
@@ -54,6 +60,7 @@ router.get('/:sourceKey/today', async (req, res) => {
 });
 
 // GET /api/kpi/:sourceKey/by-date?date=YYYY-MM-DD
+// ดึงตามวันที่ที่ผู้ใช้เลือก (เวลาไทย)
 router.get('/:sourceKey/by-date', async (req, res) => {
   try {
     const { sourceKey } = req.params;
