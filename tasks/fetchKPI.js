@@ -123,7 +123,16 @@ async function fetchKPI(cfg, saveToDB = true) {
 
     return { sourceKey: SOURCE_KEY, stationCode, stationName, ...result };
   } catch (err) {
-    console.error(`❌ [${SOURCE_KEY}] KPI Fetch Error:`, err?.response?.data || err.message || err);
+    const payload = err?.response?.data;
+    const msg = (payload?.failCode || payload?.data || err?.message || '').toString();
+
+    if (msg.includes('ACCESS_FREQUENCY_IS_TOO_HIGH')) {
+      console.error(`❌ [${SOURCE_KEY}] Rate limited: ${msg}`);
+      // ส่งสัญญาณให้รู้ว่าเป็น rate-limit
+      return { rateLimited: true };
+    }
+
+    console.error(`❌ [${SOURCE_KEY}] KPI Fetch Error:`, payload || err.message || err);
     return null;
   }
 }

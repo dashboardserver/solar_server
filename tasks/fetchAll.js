@@ -2,6 +2,10 @@ require('dotenv').config();
 const fetchKPI = require('./fetchKPI');
 const KPI = require('../models/KPI');
 
+// Cooldown กันรันถี่เกิน
+let lastRunAt = 0;
+const COOLDOWN_MS = parseInt(process.env.FETCHALL_COOLDOWN_MS || '600000', 10);
+
 function buildJobsFromEnv() {
   const A = (process.env.FUSION_A_USERNAME && process.env.FUSION_A_PASSWORD && process.env.FUSION_A_PLANT_NAME) ? {
     sourceKey:  process.env.FUSION_A_SOURCE || 'A',
@@ -36,10 +40,11 @@ function startOfBkkTomorrowUTC() {
 }
 
 // กันตั้ง retry ซ้ำในวันเดียวกันต่อสถานี
-const retryFlags = new Map(); 
+const retryFlags = new Map();
 function dayKey(date = new Date()) { return bkkYYYYMMDD(date); }
 
-async function scheduleRetry(cfg, saveToDB, delayMs = 30 * 60 * 1000) {
+// รับ delayMs และแก้ log ให้ตรงเวลา
+async function scheduleRetry(cfg, saveToDB, delayMs = 60 * 60 * 1000) { // default 60 นาที
   const key = `${cfg.sourceKey}:${dayKey()}`;
   if (retryFlags.get(key)) {
     console.log(`↩︎ [${cfg.sourceKey}] Retry already scheduled for today, skip`);
@@ -50,7 +55,7 @@ async function scheduleRetry(cfg, saveToDB, delayMs = 30 * 60 * 1000) {
   console.log(`⏲️  [${cfg.sourceKey}] Schedule retry in ${Math.round(delayMs/60000)} minutes...`);
   setTimeout(async () => {
     try {
-      console.log(`🔁 [${cfg.sourceKey}] Retry fetch now (after 30 min)`);
+      console.log(`🔁 [${cfg.sourceKey}] Retry fetch now`);
       //  เช็คถ้ามีแล้วก็ไม่ดึง
       const tomorrow = startOfBkkTomorrowUTC();
       const exists = await KPI.exists({ sourceKey: cfg.sourceKey, appliesToDate: tomorrow });
@@ -66,6 +71,15 @@ async function scheduleRetry(cfg, saveToDB, delayMs = 30 * 60 * 1000) {
 }
 
 async function fetchAll(saveToDB = true) {
+  // Global cooldown
+  const now = Date.now();
+  if (now - lastRunAt < COOLDOWN_MS) {
+    const left = Math.ceil((COOLDOWN_MS - (now - lastRunAt)) / 1000);
+    console.log(`⏳ fetchAll cooldown: skip (wait ${left}s)`);
+    return;
+  }
+  lastRunAt = now;
+
   const jobs = buildJobsFromEnv();
   if (jobs.length === 0) {
     console.warn('⚠️ No station jobs defined in .env (use FUSION_A_* / FUSION_B_*)');
@@ -81,12 +95,16 @@ async function fetchAll(saveToDB = true) {
       console.log(`🟡 [${cfg.sourceKey}] KPI for tomorrow already exists — skip fetch`);
     } else {
       const res = await fetchKPI(cfg, saveToDB);
+
       if (!res) {
-        // ดึงพลาด ตั้ง retry 30 นาที
-        await scheduleRetry(cfg, saveToDB);
+        // error ทั่วไป retry แบบ backoff ยาวขึ้น (60 นาที)
+        await scheduleRetry(cfg, saveToDB, 60 * 60 * 1000);
+      } else if (res.rateLimited) {
+        // เจอ rate-limit ไม่ retry (ปล่อยให้ถึงรอบ cron ครั้งถัดไป)
+        console.log(`[${cfg.sourceKey}] Skip retry due to rate limit (wait for next cron).`);
       }
       // กัน rate-limit หน่วงระหว่างสถานี
-      await sleep(15000);
+      await sleep(30000);
     }
   }
 }
