@@ -47,10 +47,10 @@ app.listen(PORT, async () => {
   }
 });
 
-// Cron 21:00 ทำเฉพาะ leader เพื่อลดการยิงซ้ำหลาย instance
+// Cron 19:00 ทำเฉพาะ leader เพื่อลดการยิงซ้ำหลาย instance
 if (isLeader) {
-  cron.schedule('0 21 * * *', async () => {
-    console.log('⏰ Cron 21:00 — fetch KPI for all stations');
+  cron.schedule('0 19 * * *', async () => {
+    console.log('⏰ Cron 19:00 — fetch KPI for all stations');
     try {
       await fetchAll(true);
     } catch (err) {
