@@ -18,6 +18,10 @@ app.use('/api/kpi', kpiRoutes);
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
+// วันเปิดใช้งาน
+const stationsRoutes = require('./routes/stations');
+app.use('/api/stations', stationsRoutes);
+
 // Connect MongoDB
 mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 15000 })
   .then(() => console.log('✅ MongoDB connected'))
