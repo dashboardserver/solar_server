@@ -98,12 +98,41 @@ async function fetchKPI(cfg, saveToDB = true) {
   const client = wrapper(axios.create({ baseURL: BASE_URL, jar, withCredentials: true, timeout: 20000 }));
 
   try {
-    // login
-    await client.post('/thirdData/login', { userName: USERNAME, systemCode: PASSWORD });
+    // ===== LOGIN WITH DEBUG =====
+    console.log(`[${SOURCE_KEY}] 🔐 Attempting login with username: ${USERNAME.substring(0, 3)}***`);
+    
+    const loginResponse = await client.post('/thirdData/login', { 
+      userName: USERNAME, 
+      systemCode: PASSWORD 
+    });
+    
+    // ดู response หลัง login
+    console.log(`[${SOURCE_KEY}] 📥 Login response:`, JSON.stringify({
+      success: loginResponse.data?.success,
+      failCode: loginResponse.data?.failCode,
+      data: loginResponse.data?.data
+    }, null, 2));
+    
+    // ดู cookies ที่ได้
+    const allCookies = jar.getCookiesSync(BASE_URL);
+    console.log(`[${SOURCE_KEY}] 🍪 Cookies after login (${allCookies.length}):`, 
+      allCookies.map(c => `${c.key}=${c.value.substring(0, 15)}...`)
+    );
+    
+    // ตรวจสอบว่า login สำเร็จจริงๆ
+    if (loginResponse.data?.success === false) {
+      throw new Error(`Login failed: ${loginResponse.data?.failCode || loginResponse.data?.data || 'Unknown error'}`);
+    }
 
-    // xsrf
+    // ===== XSRF TOKEN =====
     const token = jar.getCookiesSync(BASE_URL).find(c => c.key === 'XSRF-TOKEN')?.value;
-    if (!token) throw new Error('XSRF-TOKEN not found after login');
+    if (!token) {
+      console.error(`[${SOURCE_KEY}] ❌ XSRF-TOKEN NOT FOUND!`);
+      console.error(`[${SOURCE_KEY}] Available cookies:`, allCookies.map(c => c.key));
+      throw new Error('XSRF-TOKEN not found after login');
+    }
+    
+    console.log(`[${SOURCE_KEY}] ✅ XSRF-TOKEN found: ${token.substring(0, 15)}...`);
     const headers = { ...BASE_HEADERS, 'XSRF-TOKEN': token };
 
     // list stations
